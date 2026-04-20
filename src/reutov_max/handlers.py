@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from .geo import geocode_yandex, yandex_maps_link
-from .keyboards import back_to_menu, main_menu, unknown_fallback_kbd
+from .keyboards import main_menu, unknown_fallback_kbd
 from .max_client import MaxClient
 from .openai_service import OpenAIService, TicketAnalysis
 from .operator import Operator
@@ -34,9 +34,8 @@ def _format_recap(t: Ticket) -> str:
 
 WELCOME = (
     "Здравствуйте! Я бот администрации г. Реутов.\n\n"
-    "Через меня можно сообщить о городской проблеме (яма на дороге, "
-    "не работает фонарь, переполненный мусорный бак и т.п.) или задать "
-    "частый вопрос.\n\n"
+    "Через меня можно сообщить о городской проблеме: яма на дороге, "
+    "не работает фонарь, переполненный мусорный бак и т.п.\n\n"
     "Выберите действие в меню ниже 👇"
 )
 
@@ -116,22 +115,22 @@ class BotHandlers:
             await self._send_menu(chat_id, "Главное меню:")
         elif payload == "help":
             await self._client.answer_callback(cb["callback_id"])
-            await self._send(chat_id, HELP_TEXT, kbd=back_to_menu(), format="markdown")
+            await self._send(chat_id, HELP_TEXT, kbd=main_menu(faq_enabled=self._faq_enabled), format="markdown")
         elif payload == "faq":
             await self._client.answer_callback(cb["callback_id"])
             await self._send(
                 chat_id,
                 "Просто задайте свой вопрос текстом или голосом — я постараюсь ответить.\n"
                 "Например: _«Где оплатить ЖКУ?»_ или _«Как записаться к стоматологу?»_",
-                kbd=back_to_menu(),
+                kbd=main_menu(faq_enabled=self._faq_enabled),
                 format="markdown",
             )
         elif payload == "new_ticket":
             await self._client.answer_callback(cb["callback_id"])
-            await self._send(chat_id, NEW_TICKET_HINT, kbd=back_to_menu(), format="markdown")
+            await self._send(chat_id, NEW_TICKET_HINT, kbd=main_menu(faq_enabled=self._faq_enabled), format="markdown")
         elif payload == "about":
             await self._client.answer_callback(cb["callback_id"])
-            await self._send(chat_id, ABOUT_TEXT, kbd=back_to_menu(), format="markdown")
+            await self._send(chat_id, ABOUT_TEXT, kbd=main_menu(faq_enabled=self._faq_enabled), format="markdown")
         elif payload == "q_to_operator":
             await self._client.answer_callback(cb["callback_id"])
             user_id = cb.get("user", {}).get("user_id")
@@ -140,7 +139,7 @@ class BotHandlers:
                 await self._send(
                     chat_id,
                     "Не нашёл ваш последний вопрос — напишите его ещё раз, и я передам оператору.",
-                    kbd=back_to_menu(),
+                    kbd=main_menu(faq_enabled=self._faq_enabled),
                 )
                 return
             text, user_name = pending
@@ -247,7 +246,7 @@ class BotHandlers:
             return
         if intent == "faq" or (analysis.is_faq and analysis.faq_answer):
             if analysis.faq_answer:
-                await self._send(chat_id, analysis.faq_answer, kbd=back_to_menu())
+                await self._send(chat_id, analysis.faq_answer, kbd=main_menu(faq_enabled=self._faq_enabled))
                 return
         if intent == "unknown":
             self._pending_questions[user_id] = (text, user_name)
@@ -269,7 +268,7 @@ class BotHandlers:
     ) -> None:
         url = (attachment.get("payload") or {}).get("url")
         if not url:
-            await self._send(chat_id, "Не удалось получить голосовое сообщение, попробуйте ещё раз.")
+            await self._send(chat_id, "Не удалось получить голосовое сообщение, попробуйте ещё раз.", kbd=main_menu(faq_enabled=self._faq_enabled))
             return
         await self._send(chat_id, "🎙 Слушаю, расшифровываю…", format=None)
         try:
@@ -277,10 +276,10 @@ class BotHandlers:
             transcript = await self._openai.transcribe_voice(audio)
         except Exception:
             log.exception("voice transcription failed")
-            await self._send(chat_id, "Не получилось расшифровать голосовое 🥲 Попробуйте текстом.")
+            await self._send(chat_id, "Не получилось расшифровать голосовое 🥲 Попробуйте текстом.", kbd=main_menu(faq_enabled=self._faq_enabled))
             return
         if not transcript:
-            await self._send(chat_id, "Голосовое получилось пустым. Опишите проблему ещё раз.")
+            await self._send(chat_id, "Голосовое получилось пустым. Опишите проблему ещё раз.", kbd=main_menu(faq_enabled=self._faq_enabled))
             return
         analysis = await self._openai.analyze(transcript)
         await self._route_analysis(
@@ -298,7 +297,7 @@ class BotHandlers:
     ) -> None:
         url = (attachment.get("payload") or {}).get("url")
         if not url:
-            await self._send(chat_id, "Не удалось получить фото, попробуйте ещё раз.")
+            await self._send(chat_id, "Не удалось получить фото, попробуйте ещё раз.", kbd=main_menu(faq_enabled=self._faq_enabled))
             return
         await self._send(chat_id, "📷 Изучаю фотографию…", format=None)
         image_bytes = b""
@@ -351,9 +350,9 @@ class BotHandlers:
             phone = tam.get("phone")
         if phone:
             await self._repo.upsert_user(user_id, phone=phone)
-            await self._send(chat_id, f"Спасибо! Сохранил ваш телефон: {phone}", kbd=back_to_menu())
+            await self._send(chat_id, f"Спасибо! Сохранил ваш телефон: {phone}", kbd=main_menu(faq_enabled=self._faq_enabled))
         else:
-            await self._send(chat_id, "Не удалось распознать телефон в контакте.", kbd=back_to_menu())
+            await self._send(chat_id, "Не удалось распознать телефон в контакте.", kbd=main_menu(faq_enabled=self._faq_enabled))
 
     async def _handle_location(
         self,
@@ -377,6 +376,7 @@ class BotHandlers:
                 chat_id,
                 f"Спасибо! Координаты добавлены к заявке №{existing.id}.\n"
                 f"🗺 {yandex_maps_link(lat, lon)}",
+                kbd=main_menu(faq_enabled=self._faq_enabled),
             )
             if ticket:
                 await self._operator.notify(ticket)
@@ -438,10 +438,11 @@ class BotHandlers:
                 chat_id,
                 recap + "\n\nЧтобы оператор быстрее её обработал, пришлите, "
                 "пожалуйста, *геопозицию* (📎 → Геолокация) или адрес текстом.",
+                kbd=main_menu(faq_enabled=self._faq_enabled),
                 format="markdown",
             )
         else:
-            await self._send(chat_id, recap, kbd=back_to_menu(), format="markdown")
+            await self._send(chat_id, recap, kbd=main_menu(faq_enabled=self._faq_enabled), format="markdown")
         await self._operator.notify(ticket)
 
     async def _send_menu(self, chat_id: int, text: str) -> None:
