@@ -1,1 +1,1 @@
-web: python -m reutov_max.app
+web: PYTHONPATH=src python -m reutov_max.app
