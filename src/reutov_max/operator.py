@@ -10,9 +10,10 @@ log = logging.getLogger(__name__)
 
 
 def _format_card(t: Ticket) -> str:
+    contact_lines = [f"👤 *Заявитель:* {t.user_name or 'житель'}", f"🆔 user_id: `{t.user_id}`"]
     parts = [
         f"🆕 *Заявка №{t.id}*  ·  _{t.category or 'прочее'}_",
-        f"От: {t.user_name or t.user_id}  (id: `{t.user_id}`)",
+        *contact_lines,
         "",
         t.ai_summary or t.original_text or t.transcript or "(без описания)",
     ]

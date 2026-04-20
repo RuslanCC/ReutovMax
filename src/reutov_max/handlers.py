@@ -150,7 +150,9 @@ class BotHandlers:
         recipient = msg.get("recipient") or {}
         chat_id = recipient.get("chat_id")
         user_id = sender.get("user_id")
-        user_name = sender.get("name") or sender.get("first_name")
+        name = sender.get("name") or sender.get("first_name") or "житель"
+        username = sender.get("username")
+        user_name = f"{name} (@{username})" if username else name
 
         body = msg.get("body") or {}
         text = (body.get("text") or "").strip()
