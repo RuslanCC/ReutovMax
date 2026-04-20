@@ -13,15 +13,17 @@ BASE_URL = "https://botapi.max.ru"
 class MaxClient:
     """Тонкая обёртка над Max Bot API.
 
-    Используется и URL botapi.max.ru с access_token в query — как в действующих
-    клиентских библиотеках Max (см. max-bot-api-client-ts/go). Платформенный
-    URL platform-api.max.ru предполагает Authorization-заголовок; оба
-    поддерживаются, выбираем botapi.max.ru как наиболее совместимый.
+    Используется заголовок Authorization: <token>. Передача токена через
+    access_token в query больше не поддерживается Max.
     """
 
     def __init__(self, token: str, base_url: str = BASE_URL, timeout: float = 30.0) -> None:
         self._token = token
-        self._client = httpx.AsyncClient(base_url=base_url, timeout=timeout)
+        self._client = httpx.AsyncClient(
+            base_url=base_url,
+            timeout=timeout,
+            headers={"Authorization": token},
+        )
 
     async def close(self) -> None:
         await self._client.aclose()
@@ -34,8 +36,7 @@ class MaxClient:
         params: dict[str, Any] | None = None,
         json: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        params = {"access_token": self._token, **(params or {})}
-        resp = await self._client.request(method, path, params=params, json=json)
+        resp = await self._client.request(method, path, params=params or None, json=json)
         if resp.status_code >= 400:
             log.error("Max API %s %s -> %s: %s", method, path, resp.status_code, resp.text)
         resp.raise_for_status()
