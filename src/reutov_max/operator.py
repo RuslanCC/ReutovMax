@@ -9,8 +9,10 @@ from .tickets import Ticket, TicketRepo
 log = logging.getLogger(__name__)
 
 
-def _format_card(t: Ticket) -> str:
+def _format_card(t: Ticket, *, phone: str | None = None) -> str:
     contact_lines = [f"👤 *Заявитель:* {t.user_name or 'житель'}", f"🆔 user_id: `{t.user_id}`"]
+    if phone:
+        contact_lines.append(f"📞 *Телефон:* {phone}")
     parts = [
         f"🆕 *Заявка №{t.id}*  ·  _{t.category or 'прочее'}_",
         *contact_lines,
@@ -35,10 +37,11 @@ class Operator:
         self._chat_id = chat_id
 
     async def notify(self, ticket: Ticket) -> None:
+        phone = await self._repo.get_user_phone(ticket.user_id)
         try:
             resp = await self._client.send_message(
                 chat_id=self._chat_id,
-                text=_format_card(ticket),
+                text=_format_card(ticket, phone=phone),
                 attachments=[operator_card_kbd(ticket.id, lat=ticket.lat, lon=ticket.lon)],
                 format="markdown",
             )

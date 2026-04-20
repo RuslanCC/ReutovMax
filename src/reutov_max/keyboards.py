@@ -13,6 +13,7 @@ def main_menu() -> dict[str, Any]:
         [{"type": "callback", "text": "❓ Частые вопросы", "payload": "faq"}],
         [{"type": "callback", "text": "✏️ Подать заявку", "payload": "new_ticket"}],
         [{"type": "request_geo_location", "text": "📍 Отправить геопозицию", "quick": True}],
+        [{"type": "request_contact", "text": "📞 Поделиться телефоном"}],
         [{"type": "callback", "text": "ℹ️ О боте", "payload": "about"}],
     ])
 

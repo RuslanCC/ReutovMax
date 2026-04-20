@@ -32,6 +32,14 @@ CREATE TABLE IF NOT EXISTS tickets (
 );
 CREATE INDEX IF NOT EXISTS idx_tickets_user ON tickets(user_id);
 CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
+
+CREATE TABLE IF NOT EXISTS users (
+    user_id INTEGER PRIMARY KEY,
+    name TEXT,
+    username TEXT,
+    phone TEXT,
+    updated_at TEXT
+);
 """
 
 
@@ -94,6 +102,29 @@ class TicketRepo:
                 f"UPDATE tickets SET {sets} WHERE id=?", (*fields.values(), ticket_id)
             )
             await db.commit()
+
+    async def upsert_user(
+        self, user_id: int, *, name: str | None = None,
+        username: str | None = None, phone: str | None = None,
+    ) -> None:
+        ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        async with aiosqlite.connect(self._db_path) as db:
+            await db.execute(
+                "INSERT INTO users(user_id,name,username,phone,updated_at) VALUES(?,?,?,?,?) "
+                "ON CONFLICT(user_id) DO UPDATE SET "
+                "  name=COALESCE(excluded.name,name),"
+                "  username=COALESCE(excluded.username,username),"
+                "  phone=COALESCE(excluded.phone,phone),"
+                "  updated_at=excluded.updated_at",
+                (user_id, name, username, phone, ts),
+            )
+            await db.commit()
+
+    async def get_user_phone(self, user_id: int) -> str | None:
+        async with aiosqlite.connect(self._db_path) as db:
+            async with db.execute("SELECT phone FROM users WHERE user_id=?", (user_id,)) as cur:
+                row = await cur.fetchone()
+        return row[0] if row else None
 
     async def latest_awaiting_location(self, user_id: int) -> Ticket | None:
         async with aiosqlite.connect(self._db_path) as db:

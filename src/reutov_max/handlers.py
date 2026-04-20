@@ -158,6 +158,16 @@ class BotHandlers:
         text = (body.get("text") or "").strip()
         attachments = body.get("attachments") or []
 
+        await self._repo.upsert_user(
+            user_id, name=name, username=username,
+        )
+
+        # 0) контакт (телефон)
+        for att in attachments:
+            if att.get("type") == "contact":
+                await self._handle_contact(chat_id, user_id, att)
+                return
+
         # 1) геопозиция
         for att in attachments:
             if att.get("type") == "location":
@@ -271,6 +281,23 @@ class BotHandlers:
         )
         await self._maybe_geocode(ticket)
         await self._finish_ticket(ticket, chat_id)
+
+    async def _handle_contact(self, chat_id: int, user_id: int, att: dict) -> None:
+        payload = att.get("payload") or {}
+        vcf = payload.get("vcf_info") or ""
+        phone = None
+        for line in vcf.splitlines():
+            if line.upper().startswith("TEL"):
+                phone = line.split(":", 1)[-1].strip()
+                break
+        if not phone:
+            tam = payload.get("tam_info") or {}
+            phone = tam.get("phone")
+        if phone:
+            await self._repo.upsert_user(user_id, phone=phone)
+            await self._send(chat_id, f"Спасибо! Сохранил ваш телефон: {phone}", kbd=back_to_menu())
+        else:
+            await self._send(chat_id, "Не удалось распознать телефон в контакте.", kbd=back_to_menu())
 
     async def _handle_location(
         self,
