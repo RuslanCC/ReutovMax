@@ -7,15 +7,19 @@ def _kbd(buttons: list[list[dict[str, Any]]]) -> dict[str, Any]:
     return {"type": "inline_keyboard", "payload": {"buttons": buttons}}
 
 
-def main_menu() -> dict[str, Any]:
-    return _kbd([
+def main_menu(*, faq_enabled: bool = True) -> dict[str, Any]:
+    rows: list[list[dict[str, Any]]] = [
         [{"type": "callback", "text": "📋 Как со мной общаться", "payload": "help"}],
-        [{"type": "callback", "text": "❓ Частые вопросы", "payload": "faq"}],
+    ]
+    if faq_enabled:
+        rows.append([{"type": "callback", "text": "❓ Частые вопросы", "payload": "faq"}])
+    rows.extend([
         [{"type": "callback", "text": "✏️ Подать заявку", "payload": "new_ticket"}],
         [{"type": "request_geo_location", "text": "📍 Отправить геопозицию", "quick": True}],
         [{"type": "request_contact", "text": "📞 Поделиться телефоном"}],
         [{"type": "callback", "text": "ℹ️ О боте", "payload": "about"}],
     ])
+    return _kbd(rows)
 
 
 def back_to_menu() -> dict[str, Any]:

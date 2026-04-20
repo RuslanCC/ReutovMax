@@ -106,6 +106,7 @@ def build_app() -> web.Application:
     handlers = BotHandlers(
         client, openai_service, repo, operator,
         yandex_geocoder_key=settings.yandex_geocoder_key,
+        faq_enabled=settings.faq_enabled,
     )
 
     app = web.Application()

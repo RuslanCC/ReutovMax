@@ -72,12 +72,14 @@ class BotHandlers:
         operator: Operator,
         *,
         yandex_geocoder_key: str | None,
+        faq_enabled: bool = True,
     ) -> None:
         self._client = client
         self._openai = openai
         self._repo = repo
         self._operator = operator
         self._yandex_key = yandex_geocoder_key
+        self._faq_enabled = faq_enabled
         # user_id -> (text, user_name) последнего вопроса с intent=unknown,
         # чтобы по нажатию «Передать оператору» завести заявку из этого текста.
         self._pending_questions: dict[int, tuple[str, str | None]] = {}
@@ -234,6 +236,15 @@ class BotHandlers:
         transcript: str | None = None,
     ) -> None:
         intent = (analysis.intent or "").lower()
+        if not self._faq_enabled:
+            # FAQ-ответы и фолбэк «unknown» отключены — всё идёт в заявку.
+            if not analysis.summary:
+                analysis.summary = text[:280]
+            await self._create_text_ticket(
+                chat_id, user_id, user_name, text, analysis,
+                kind=kind, transcript=transcript,
+            )
+            return
         if intent == "faq" or (analysis.is_faq and analysis.faq_answer):
             if analysis.faq_answer:
                 await self._send(chat_id, analysis.faq_answer, kbd=back_to_menu())
@@ -435,7 +446,9 @@ class BotHandlers:
 
     async def _send_menu(self, chat_id: int, text: str) -> None:
         await self._client.send_message(
-            chat_id=chat_id, text=text, attachments=[main_menu()], format="markdown",
+            chat_id=chat_id, text=text,
+            attachments=[main_menu(faq_enabled=self._faq_enabled)],
+            format="markdown",
         )
 
     async def _send(

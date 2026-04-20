@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     openai_chat_model: str = Field(default="gpt-4o-mini", alias="OPENAI_CHAT_MODEL")
     openai_transcribe_model: str = Field(default="whisper-1", alias="OPENAI_TRANSCRIBE_MODEL")
 
+    # Флаг: отвечать ли на общие информационные вопросы из базы знаний.
+    # Когда false — любое текстовое/голосовое сообщение идёт в пайплайн заявки.
+    faq_enabled: bool = Field(default=False, alias="FAQ_ENABLED")
+
     def resolve_webhook_url(self) -> str | None:
         if self.webhook_url:
             return self.webhook_url.rstrip("/") + "/webhook" if not self.webhook_url.endswith("/webhook") else self.webhook_url
