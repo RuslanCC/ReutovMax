@@ -100,10 +100,13 @@ class MaxClient:
         message: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         body: dict[str, Any] = {}
-        if notification:
-            body["notification"] = notification
         if message:
             body["message"] = message
+        # Max требует либо message, либо notification — тихо подставляем "✓"
+        if "message" not in body:
+            body["notification"] = notification or "✓"
+        elif notification:
+            body["notification"] = notification
         return await self._request(
             "POST", "/answers", params={"callback_id": callback_id}, json=body
         )

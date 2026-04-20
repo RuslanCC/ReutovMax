@@ -170,6 +170,7 @@ class BotHandlers:
             await self._send_menu(chat_id, WELCOME if low in ("start", "начать") else "Главное меню:")
             return
 
+        await self._send(chat_id, "🤔 Обрабатываю ваше сообщение…", format=None)
         analysis = await self._openai.analyze(text)
         if analysis.is_faq and analysis.faq_answer:
             await self._send(chat_id, analysis.faq_answer, kbd=back_to_menu())
@@ -183,6 +184,7 @@ class BotHandlers:
         if not url:
             await self._send(chat_id, "Не удалось получить голосовое сообщение, попробуйте ещё раз.")
             return
+        await self._send(chat_id, "🎙 Слушаю, расшифровываю…", format=None)
         try:
             audio = await self._client.download(url)
             transcript = await self._openai.transcribe_voice(audio)
@@ -214,6 +216,7 @@ class BotHandlers:
         if not url:
             await self._send(chat_id, "Не удалось получить фото, попробуйте ещё раз.")
             return
+        await self._send(chat_id, "📷 Изучаю фотографию…", format=None)
         image_bytes = b""
         try:
             image_bytes = await self._client.download(url)
