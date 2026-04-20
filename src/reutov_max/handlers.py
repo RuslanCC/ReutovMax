@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from .geo import geocode_yandex, yandex_maps_link
-from .keyboards import back_to_menu, main_menu
+from .keyboards import back_to_menu, main_menu, unknown_fallback_kbd
 from .max_client import MaxClient
 from .openai_service import OpenAIService, TicketAnalysis
 from .operator import Operator
@@ -78,6 +78,9 @@ class BotHandlers:
         self._repo = repo
         self._operator = operator
         self._yandex_key = yandex_geocoder_key
+        # user_id -> (text, user_name) последнего вопроса с intent=unknown,
+        # чтобы по нажатию «Передать оператору» завести заявку из этого текста.
+        self._pending_questions: dict[int, tuple[str, str | None]] = {}
 
     async def dispatch(self, update: dict[str, Any]) -> None:
         utype = update.get("update_type")
@@ -127,6 +130,23 @@ class BotHandlers:
         elif payload == "about":
             await self._client.answer_callback(cb["callback_id"])
             await self._send(chat_id, ABOUT_TEXT, kbd=back_to_menu(), format="markdown")
+        elif payload == "q_to_operator":
+            await self._client.answer_callback(cb["callback_id"])
+            user_id = cb.get("user", {}).get("user_id")
+            pending = self._pending_questions.pop(user_id, None) if user_id else None
+            if not pending:
+                await self._send(
+                    chat_id,
+                    "Не нашёл ваш последний вопрос — напишите его ещё раз, и я передам оператору.",
+                    kbd=back_to_menu(),
+                )
+                return
+            text, user_name = pending
+            analysis = TicketAnalysis(
+                intent="ticket", is_faq=False, faq_answer=None,
+                summary=text[:280], category="прочее", address=None,
+            )
+            await self._create_text_ticket(chat_id, user_id, user_name, text, analysis)
         elif payload.startswith("op_take:"):
             ticket_id = int(payload.split(":")[1])
             await self._repo.update(ticket_id, status="in_progress")
@@ -200,10 +220,38 @@ class BotHandlers:
 
         await self._send(chat_id, "🤔 Обрабатываю ваше сообщение…", format=None)
         analysis = await self._openai.analyze(text)
-        if analysis.is_faq and analysis.faq_answer:
-            await self._send(chat_id, analysis.faq_answer, kbd=back_to_menu())
+        await self._route_analysis(chat_id, user_id, user_name, text, analysis)
+
+    async def _route_analysis(
+        self,
+        chat_id: int,
+        user_id: int,
+        user_name: str | None,
+        text: str,
+        analysis: TicketAnalysis,
+        *,
+        kind: str = "text",
+        transcript: str | None = None,
+    ) -> None:
+        intent = (analysis.intent or "").lower()
+        if intent == "faq" or (analysis.is_faq and analysis.faq_answer):
+            if analysis.faq_answer:
+                await self._send(chat_id, analysis.faq_answer, kbd=back_to_menu())
+                return
+        if intent == "unknown":
+            self._pending_questions[user_id] = (text, user_name)
+            fallback = (
+                "Не нашёл точного ответа в справочной базе. "
+                "Попробуйте переформулировать вопрос или позвоните в приёмную "
+                "администрации: *+7 (498) 661-25-25* (Пн–Чт 9:00–18:00, Пт 9:00–16:45).\n\n"
+                "Если хотите, я могу передать ваш вопрос оператору — нажмите кнопку ниже."
+            )
+            await self._send(chat_id, fallback, kbd=unknown_fallback_kbd(), format="markdown")
             return
-        await self._create_text_ticket(chat_id, user_id, user_name, text, analysis)
+        await self._create_text_ticket(
+            chat_id, user_id, user_name, text, analysis,
+            kind=kind, transcript=transcript,
+        )
 
     async def _handle_voice(
         self, chat_id: int, user_id: int, user_name: str | None, attachment: dict[str, Any]
@@ -224,10 +272,7 @@ class BotHandlers:
             await self._send(chat_id, "Голосовое получилось пустым. Опишите проблему ещё раз.")
             return
         analysis = await self._openai.analyze(transcript)
-        if analysis.is_faq and analysis.faq_answer:
-            await self._send(chat_id, analysis.faq_answer, kbd=back_to_menu())
-            return
-        await self._create_text_ticket(
+        await self._route_analysis(
             chat_id, user_id, user_name, transcript, analysis,
             kind="voice", transcript=transcript,
         )

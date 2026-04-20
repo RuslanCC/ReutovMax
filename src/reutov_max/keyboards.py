@@ -22,6 +22,13 @@ def back_to_menu() -> dict[str, Any]:
     return _kbd([[{"type": "callback", "text": "⬅️ В главное меню", "payload": "menu"}]])
 
 
+def unknown_fallback_kbd() -> dict[str, Any]:
+    return _kbd([
+        [{"type": "callback", "text": "📨 Передать вопрос оператору", "payload": "q_to_operator"}],
+        [{"type": "callback", "text": "⬅️ В главное меню", "payload": "menu"}],
+    ])
+
+
 def operator_card_kbd(ticket_id: int, *, lat: float | None, lon: float | None) -> dict[str, Any]:
     rows: list[list[dict[str, Any]]] = []
     if lat is not None and lon is not None:

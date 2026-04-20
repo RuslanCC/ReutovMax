@@ -20,7 +20,12 @@ def _load_system_prompt() -> str:
     base = Path(__file__).resolve().parent.parent.parent / "prompts"
     sys_p = (base / "system_prompt.md").read_text(encoding="utf-8")
     faq_p = (base / "faq.md").read_text(encoding="utf-8")
-    return f"{sys_p}\n\n## База FAQ\n\n{faq_p}"
+    contacts_p = (base / "contacts.md").read_text(encoding="utf-8")
+    return (
+        f"{sys_p}\n\n"
+        f"## База FAQ\n\n{faq_p}\n\n"
+        f"## Справочник контактов\n\n{contacts_p}"
+    )
 
 
 async def _on_startup(app: web.Application) -> None:

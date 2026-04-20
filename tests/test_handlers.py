@@ -39,7 +39,7 @@ def _make_handlers(repo: TicketRepo, analysis: TicketAnalysis) -> tuple[BotHandl
 
 async def test_text_ticket_creates_record(repo: TicketRepo) -> None:
     analysis = TicketAnalysis(
-        is_faq=False, faq_answer=None,
+        intent="ticket", is_faq=False, faq_answer=None,
         summary="Яма на ул. Ленина 5", category="дороги", address="ул. Ленина 5",
     )
     h, client, operator = _make_handlers(repo, analysis)
@@ -57,7 +57,7 @@ async def test_text_ticket_creates_record(repo: TicketRepo) -> None:
 
 async def test_faq_does_not_create_ticket(repo: TicketRepo) -> None:
     analysis = TicketAnalysis(
-        is_faq=True, faq_answer="Часы работы 9-18", summary="", category="прочее", address=None,
+        intent="faq", is_faq=True, faq_answer="Часы работы 9-18", summary="", category="прочее", address=None,
     )
     h, _, operator = _make_handlers(repo, analysis)
     await h.dispatch({
@@ -72,7 +72,7 @@ async def test_faq_does_not_create_ticket(repo: TicketRepo) -> None:
 
 
 async def test_bot_started_sends_menu(repo: TicketRepo) -> None:
-    analysis = TicketAnalysis(False, None, "", "прочее", None)
+    analysis = TicketAnalysis("ticket", False, None, "", "прочее", None)
     h, client, _ = _make_handlers(repo, analysis)
     await h.dispatch({"update_type": "bot_started", "chat_id": 555, "user": {"user_id": 1}})
     client.send_message.assert_awaited_once()
@@ -83,7 +83,7 @@ async def test_bot_started_sends_menu(repo: TicketRepo) -> None:
 
 
 async def test_location_attaches_to_pending_ticket(repo: TicketRepo) -> None:
-    analysis = TicketAnalysis(False, None, "Заявка", "прочее", None)
+    analysis = TicketAnalysis("ticket", False, None, "Заявка", "прочее", None)
     h, _, operator = _make_handlers(repo, analysis)
     # 1) житель присылает текст без адреса -> ticket awaiting_location
     await h.dispatch({

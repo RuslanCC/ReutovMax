@@ -14,6 +14,7 @@ log = logging.getLogger(__name__)
 @dataclass
 class TicketAnalysis:
     """Структурированный разбор обращения жителя."""
+    intent: str            # "faq" | "ticket" | "unknown"
     is_faq: bool
     faq_answer: str | None
     summary: str           # короткое описание заявки для оператора
@@ -69,8 +70,9 @@ class OpenAIService:
         schema = {
             "type": "object",
             "additionalProperties": False,
-            "required": ["is_faq", "faq_answer", "summary", "category", "address"],
+            "required": ["intent", "is_faq", "faq_answer", "summary", "category", "address"],
             "properties": {
+                "intent": {"type": "string", "enum": ["faq", "ticket", "unknown"]},
                 "is_faq": {"type": "boolean"},
                 "faq_answer": {"type": ["string", "null"]},
                 "summary": {"type": "string"},
@@ -92,10 +94,17 @@ class OpenAIService:
                     "role": "user",
                     "content": (
                         "Сообщение жителя:\n---\n" + text + "\n---\n"
-                        "Если это вопрос, на который есть ответ в FAQ из системного "
-                        "промта, верни is_faq=true и заполни faq_answer. Иначе это "
-                        "заявка о городской проблеме — заполни summary (1-2 предложения), "
-                        "category и address (если адрес явно упомянут, иначе null)."
+                        "Определи intent:\n"
+                        "- 'faq' — информационный вопрос, ответ есть в FAQ/контактах: "
+                        "поставь is_faq=true, заполни faq_answer коротко (1-3 предложения) "
+                        "с телефоном/ссылкой из базы знаний.\n"
+                        "- 'ticket' — сообщение о конкретной городской проблеме: "
+                        "заполни summary (1-2 предложения), category, address (если упомянут).\n"
+                        "- 'unknown' — не удаётся уверенно определить ни FAQ, ни заявку: "
+                        "is_faq=false, faq_answer=null, category='прочее', в summary — "
+                        "краткое описание вопроса для оператора.\n"
+                        "Не выдумывай телефоны и адреса; используй только те, что указаны "
+                        "в системном промте."
                     ),
                 },
             ],
