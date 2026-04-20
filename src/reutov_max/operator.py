@@ -34,13 +34,9 @@ class Operator:
         self._chat_id = chat_id
 
     async def notify(self, ticket: Ticket) -> None:
-        # Положительный id трактуем как user_id (личный диалог), отрицательный — как chat_id группы
-        target = (
-            {"user_id": self._chat_id} if self._chat_id > 0 else {"chat_id": self._chat_id}
-        )
         try:
             resp = await self._client.send_message(
-                **target,
+                chat_id=self._chat_id,
                 text=_format_card(ticket),
                 attachments=[operator_card_kbd(ticket.id, lat=ticket.lat, lon=ticket.lon)],
                 format="markdown",

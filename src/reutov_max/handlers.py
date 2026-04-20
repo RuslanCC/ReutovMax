@@ -13,6 +13,25 @@ from .utils.media import extract_gps
 
 log = logging.getLogger(__name__)
 
+
+def _format_recap(t: Ticket) -> str:
+    parts = [f"✅ *Заявка №{t.id} принята.* Спасибо за обращение!", ""]
+    parts.append(f"*Категория:* {t.category or 'прочее'}")
+    if t.ai_summary:
+        parts.append(f"*Суть:* {t.ai_summary}")
+    if t.kind == "voice" and t.transcript:
+        parts.append(f"*Расшифровка голосового:* «{t.transcript}»")
+    if t.kind == "photo":
+        if t.original_text:
+            parts.append(f"*Ваша подпись:* {t.original_text}")
+        if t.ai_summary:
+            parts.append(f"*На фото:* {t.ai_summary}")
+    if t.address:
+        parts.append(f"*Адрес:* {t.address}")
+    elif t.lat is not None and t.lon is not None:
+        parts.append(f"*Координаты:* {t.lat:.5f}, {t.lon:.5f}")
+    return "\n".join(parts)
+
 WELCOME = (
     "Здравствуйте! Я бот администрации г. Реутов.\n\n"
     "Через меня можно сообщить о городской проблеме (яма на дороге, "
@@ -130,9 +149,6 @@ class BotHandlers:
             return
         recipient = msg.get("recipient") or {}
         chat_id = recipient.get("chat_id")
-        # игнорируем сообщения в групповом чате оператора, чтобы не зациклиться
-        if chat_id == self._operator._chat_id:  # noqa: SLF001
-            return
         user_id = sender.get("user_id")
         user_name = sender.get("name") or sender.get("first_name")
 
@@ -329,21 +345,18 @@ class BotHandlers:
         ticket.lat, ticket.lon, ticket.address, ticket.geo_source = lat, lon, normalized, "ai_text"
 
     async def _finish_ticket(self, ticket: Ticket, chat_id: int) -> None:
+        recap = _format_recap(ticket)
         # если адреса нет — просим уточнить
         if ticket.lat is None and not ticket.address:
             await self._repo.update(ticket.id, status="awaiting_location")
             await self._send(
                 chat_id,
-                f"Заявка №{ticket.id} принята! Чтобы оператор быстрее её обработал, "
-                "пришлите, пожалуйста, *геопозицию* (📎 → Геолокация) или адрес текстом.",
+                recap + "\n\nЧтобы оператор быстрее её обработал, пришлите, "
+                "пожалуйста, *геопозицию* (📎 → Геолокация) или адрес текстом.",
                 format="markdown",
             )
         else:
-            await self._send(
-                chat_id,
-                f"✅ Заявка №{ticket.id} принята. Спасибо за обращение!",
-                kbd=back_to_menu(),
-            )
+            await self._send(chat_id, recap, kbd=back_to_menu(), format="markdown")
         await self._operator.notify(ticket)
 
     async def _send_menu(self, chat_id: int, text: str) -> None:
